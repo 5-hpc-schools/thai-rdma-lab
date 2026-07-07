@@ -1,19 +1,34 @@
-# MPI Training on LANTA HPC
+# MPI in C on LANTA HPC
 
-This module teaches how to compile and run C++ MPI programs on LANTA, then measure how environment choices affect performance.
+This module accompanies the Mohr HPC/MPI slides in `~/slides` and adapts the hands-on flow to LANTA. The code is intentionally C, not C++, so learners practice the same pointer, buffer, datatype, and explicit communication habits they will need for the RDMA training next week.
 
 Start with [LANTA workflow notes](LANTA_WORKFLOW.md) if this is your first time using the command line, transferring files, loading modules, or submitting Slurm jobs on LANTA.
 
-## What Students Compare
+## Slide Alignment
 
-| Example | Main lesson | Environment knobs |
-|---|---|---|
-| `hello_environment` | Inspect rank placement and loaded runtime environment | Slurm rank layout, loaded modules, CPU binding |
-| `compute_pi` | Compute-bound scaling | Compiler toolchain, optimization level, number of ranks |
-| `memory_stream` | Per-rank memory bandwidth | Ranks per node, CPU binding, NUMA placement |
-| `ping_pong` | Point-to-point latency and bandwidth | Same-node vs cross-node placement, message size |
-| `allreduce_benchmark` | Collective communication cost | Rank count, node count, MPI collective implementation |
-| `halo_exchange` | Neighbor communication pattern | Rank mapping, node count, communication/computation ratio |
+| Slide deck | Tutorial focus |
+|---|---|
+| `ASEAN2026-0-mohr-parallel101.pdf` | parallel terminology, performance, strong/weak scaling, distributed memory |
+| `ASEAN2026-1-mohr-mpi101.pdf` | SPMD, ranks, communicators, MPI messages, collectives, work distribution, polynomial example |
+| `ASEAN2026-3-mohr-handson.pdf` | cluster access, job scripts, MPI hello, Pi exercise |
+
+## Exercise Sequence
+
+| Step | Program | Slide topic | What learners practice |
+|---|---|---|---|
+| 1 | `hello_mpi` | MPI basic routines | `MPI_Init`, `MPI_Comm_rank`, `MPI_Comm_size`, rank placement |
+| 2 | `rank_control` | SPMD control flow | rank 0 does one thing, all ranks do another |
+| 3 | `work_distribution` | cyclic and block-balanced work | mapping loop iterations to ranks |
+| 4 | `pi_serial` | serial baseline | one-process midpoint integration |
+| 5 | `pi_mpi` | MPI collective reduction | cyclic work plus `MPI_Reduce` |
+| 6 | `poly_serial` | polynomial example | file input and serial search |
+| 7 | `poly_mpi` | broadcast and reduce | rank 0 input, `MPI_Bcast`, distributed search, `MPI_Reduce` |
+| 8 | `ping_pong` | MPI messages | explicit buffers, counts, datatypes, latency, bandwidth |
+| 9 | `collective_cost` | collectives | `MPI_Allreduce` payload-size cost |
+| 10 | `halo_exchange` | ghost-cell communication | neighbor exchange with nonblocking point-to-point MPI |
+| 11 | `memory_stream` | node-level performance | rank density, memory bandwidth, CPU binding |
+
+The first seven programs are the core slide companion. The last four are short bridges toward RDMA: they make learners look directly at buffers, message sizes, rank placement, memory movement, and nearest-neighbor data exchange.
 
 ## LANTA Notes
 
@@ -21,6 +36,7 @@ These instructions follow the ThaiSC LANTA public documentation checked on 2026-
 
 - LANTA is an HPE Cray EX cluster. ThaiSC recommends the HPE Cray Programming Environment for compatibility with the HPE Slingshot network.
 - Use Cray compiler wrappers for native Cray MPICH builds: `cc` for C, `CC` for C++, and `ftn` for Fortran.
+- This tutorial uses `cc` and C11.
 - Launch MPI programs with `srun` inside Slurm jobs, not `mpirun`, `mpiexec`, or `aprun`.
 - Current documented CPE toolchains include `cpeCray/25.03`, `cpeGNU/25.03`, and `cpeIntel/25.03`.
 - Since the LANTA Slurm 24.05 upgrade, `#SBATCH --cpus-per-task` is inherited by `srun` by default. In hybrid jobs, pure-MPI preprocessing steps may still need `srun -c1`.
@@ -43,10 +59,10 @@ module load cpeCray/25.03
 make
 ```
 
-The Makefile defaults to the Cray C++ wrapper `CC`. To build with another MPI wrapper on a non-LANTA system:
+The Makefile defaults to the Cray C wrapper `cc`. To build with another MPI C wrapper on a non-LANTA system:
 
 ```bash
-make CXX=mpicxx
+make CC=mpicc
 ```
 
 ## Run a Quick Check
@@ -59,6 +75,29 @@ sbatch jobs/quick_check.slurm
 ```
 
 For short class exercises, the scripts use `compute-devel`. Change the partition to `compute` for normal production runs if your account or queue policy requires it.
+
+## Manual Slide Companion Commands
+
+Inside an allocation or job script:
+
+```bash
+srun -n 4 ./build/hello_mpi
+srun -n 4 ./build/rank_control
+srun -n 4 ./build/work_distribution --items 16 --mode cyclic
+srun -n 4 ./build/work_distribution --items 16 --mode block
+srun -n 1 ./build/pi_serial --steps 10000000
+srun -n 4 ./build/pi_mpi --steps 10000000
+srun -n 1 ./build/poly_serial --input input/poly.dat
+srun -n 4 ./build/poly_mpi --input input/poly.dat
+```
+
+RDMA-prep probes:
+
+```bash
+srun -n 2 ./build/ping_pong --max-bytes 8M
+srun -n 8 ./build/collective_cost --max-bytes 8M
+srun -n 8 ./build/halo_exchange --points-per-rank 500000
+```
 
 ## Comparison Jobs
 
@@ -82,10 +121,10 @@ sbatch -A ltYOURPROJECT jobs/compare_network.slurm
 
 Look for patterns, not single numbers.
 
-- If `compute_pi` changes significantly between `-O0`, `-O2`, and `-O3`, students are seeing compiler optimization effects.
+- If `pi_mpi` changes significantly between `-O0`, `-O2`, and `-O3`, students are seeing compiler optimization effects.
 - If `memory_stream` slows down as ranks per node increase, students are seeing memory bandwidth contention.
 - If `ping_pong` latency is higher across two nodes than within one node, students are seeing network latency.
-- If `allreduce_benchmark` grows nonlinearly with rank count or message size, students are seeing collective communication cost.
-- If `halo_exchange` changes when the same total ranks are placed on one node versus two nodes, students are seeing how rank layout affects nearest-neighbor communication.
+- If `collective_cost` grows nonlinearly with rank count or message size, students are seeing collective communication cost.
+- If `halo_exchange` changes when the same total ranks are placed on one node versus two nodes, students are seeing how rank layout affects neighbor communication.
 
 Record the loaded modules, Slurm allocation, rank layout, and benchmark output together. Performance results without the environment are hard to explain later.

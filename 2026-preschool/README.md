@@ -4,4 +4,4 @@ Training materials for the 2026 preschool program.
 
 ## Modules
 
-- [MPI training on LANTA](mpi-lanta/README.md): C++ MPI examples, build instructions, and Slurm scripts for observing how compiler toolchains, optimization flags, rank placement, CPU binding, and network placement affect performance.
+- [MPI training on LANTA](mpi-lanta/README.md): C MPI exercises aligned with the Mohr slides, LANTA build/run instructions, Slurm scripts, and performance probes that prepare learners for RDMA concepts.

@@ -26,10 +26,10 @@ for opt in O0 O2 O3 Ofast; do
     echo "Optimization: -${opt}"
     echo "============================================================"
 
-    make CXX=CC BUILD_DIR="${build_dir}" CXXFLAGS="-${opt} -std=c++17 -Wall -Wextra -pedantic"
+    make CC=cc BUILD_DIR="${build_dir}" CFLAGS="-${opt} -std=c11 -Wall -Wextra -pedantic"
 
     echo "== Compute-bound sensitivity =="
-    srun "${build_dir}/compute_pi" --steps 100000000
+    srun "${build_dir}/pi_mpi" --steps 100000000
 
     echo "== Memory-bandwidth sensitivity =="
     srun "${build_dir}/memory_stream" --mib-per-rank 64 --iters 8

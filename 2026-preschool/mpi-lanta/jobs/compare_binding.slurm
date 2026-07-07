@@ -18,10 +18,10 @@ module load cpeCray/25.03
 module list
 ./scripts/record_context.sh
 
-make CXX=CC
+make CC=cc
 
 echo "== Allocation and rank placement =="
-srun ./build/hello_environment
+srun ./build/hello_mpi
 
 for bind in cores sockets none; do
     echo
@@ -33,7 +33,7 @@ for bind in cores sockets none; do
     srun --cpu-bind="${bind}" ./build/memory_stream --mib-per-rank 64 --iters 8
 
     echo "== Collective latency/bandwidth =="
-    srun --cpu-bind="${bind}" ./build/allreduce_benchmark --max-bytes 1M --iters 100 --warmup 10
+    srun --cpu-bind="${bind}" ./build/collective_cost --max-bytes 1M --iters 100 --warmup 10
 done
 
 for distribution in block:block cyclic:cyclic; do

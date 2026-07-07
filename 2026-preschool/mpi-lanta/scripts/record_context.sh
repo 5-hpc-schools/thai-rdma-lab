@@ -27,11 +27,11 @@ if command -v module >/dev/null 2>&1; then
     module list 2>&1 || true
 fi
 
-if command -v CC >/dev/null 2>&1; then
-    echo "CC_version"
-    CC --version 2>&1 | head -5 || true
-    echo "CC_cray_options"
-    CC --cray-print-opts=all 2>&1 || true
+if command -v cc >/dev/null 2>&1; then
+    echo "cc_version"
+    cc --version 2>&1 | head -5 || true
+    echo "cc_cray_options"
+    cc --cray-print-opts=all 2>&1 || true
 fi
 
 if [ -n "${SLURM_JOB_ID:-}" ] && command -v scontrol >/dev/null 2>&1; then

@@ -1,12 +1,13 @@
-PROGRAMS := hello_environment compute_pi memory_stream ping_pong allreduce_benchmark halo_exchange
+PROGRAMS := hello_mpi rank_control work_distribution pi_serial pi_mpi poly_serial poly_mpi \
+            ping_pong collective_cost halo_exchange memory_stream
 BUILD_DIR ?= build
 CPPFLAGS ?= -Iinclude
-CXXFLAGS ?= -O3 -std=c++17 -Wall -Wextra -pedantic
+CFLAGS ?= -O3 -std=c11 -Wall -Wextra -pedantic
 LDFLAGS ?=
-LDLIBS ?=
+LDLIBS ?= -lm
 
-ifeq ($(origin CXX),default)
-CXX := CC
+ifeq ($(origin CC),default)
+CC := cc
 endif
 
 TARGETS := $(addprefix $(BUILD_DIR)/,$(PROGRAMS))
@@ -18,15 +19,15 @@ all: $(TARGETS)
 $(BUILD_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/%: src/%.cpp include/mpi_training.hpp | $(BUILD_DIR)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
+$(BUILD_DIR)/%: src/%.c include/mpi_training.h | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 
 print-env:
-	@echo "CXX=$(CXX)"
+	@echo "CC=$(CC)"
 	@echo "CPPFLAGS=$(CPPFLAGS)"
-	@echo "CXXFLAGS=$(CXXFLAGS)"
+	@echo "CFLAGS=$(CFLAGS)"
 	@echo "BUILD_DIR=$(BUILD_DIR)"
-	@$(CXX) --version 2>&1 | head -5 || true
+	@$(CC) --version 2>&1 | head -5 || true
 
 clean:
 	rm -rf build

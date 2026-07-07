@@ -14,7 +14,7 @@ module load "${toolchain}"
 module list
 
 ./scripts/record_context.sh
-make print-env CXX=CC BUILD_DIR="build/${safe_toolchain}"
-make CXX=CC BUILD_DIR="build/${safe_toolchain}"
+make print-env CC=cc BUILD_DIR="build/${safe_toolchain}"
+make CC=cc BUILD_DIR="build/${safe_toolchain}"
 
 echo "Built examples in build/${safe_toolchain}"

@@ -86,9 +86,9 @@ module list
 For MPI programs on LANTA, use the Cray wrappers from the active programming environment:
 
 ```bash
-CC --version
-CC --cray-print-opts=all
-make CXX=CC
+cc --version
+cc --cray-print-opts=all
+make CC=cc
 ```
 
 Keep the build and run environments consistent. If you compile with `cpeCray/25.03`, load the same toolchain in the Slurm job before running the executable. Do not hide module loads in `~/.bashrc`; put them in the job script so the run is auditable.
@@ -130,8 +130,8 @@ hostname
 git status --short
 git log --oneline -1
 module list
-CC --version
-make print-env CXX=CC
+cc --version
+make print-env CC=cc
 scontrol show job "$SLURM_JOB_ID"
 ```
 

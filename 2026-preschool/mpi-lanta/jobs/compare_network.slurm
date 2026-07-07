@@ -18,10 +18,10 @@ module load cpeCray/25.03
 module list
 ./scripts/record_context.sh
 
-make CXX=CC
+make CC=cc
 
 echo "== Allocation and rank placement =="
-srun ./build/hello_environment
+srun ./build/hello_mpi
 
 echo
 echo "== Ping-pong: two ranks on one node =="
@@ -41,8 +41,8 @@ srun -N 2 -n 8 --ntasks-per-node=4 --cpu-bind=cores ./build/halo_exchange --poin
 
 echo
 echo "== Allreduce: eight ranks on one node =="
-srun -N 1 -n 8 --ntasks-per-node=8 --cpu-bind=cores ./build/allreduce_benchmark --max-bytes 8M --iters 100 --warmup 10
+srun -N 1 -n 8 --ntasks-per-node=8 --cpu-bind=cores ./build/collective_cost --max-bytes 8M --iters 100 --warmup 10
 
 echo
 echo "== Allreduce: eight ranks across two nodes =="
-srun -N 2 -n 8 --ntasks-per-node=4 --cpu-bind=cores ./build/allreduce_benchmark --max-bytes 8M --iters 100 --warmup 10
+srun -N 2 -n 8 --ntasks-per-node=4 --cpu-bind=cores ./build/collective_cost --max-bytes 8M --iters 100 --warmup 10

@@ -32,17 +32,17 @@ for toolchain in "${toolchains[@]}"; do
     module list
     ./scripts/record_context.sh
 
-    make CXX=CC BUILD_DIR="${build_dir}" CXXFLAGS="-O3 -std=c++17 -Wall -Wextra -pedantic"
+    make CC=cc BUILD_DIR="${build_dir}" CFLAGS="-O3 -std=c11 -Wall -Wextra -pedantic"
 
     echo "== Rank placement for ${toolchain} =="
-    srun "${build_dir}/hello_environment"
+    srun "${build_dir}/hello_mpi"
 
     echo "== Compute kernel for ${toolchain} =="
-    srun "${build_dir}/compute_pi" --steps 100000000
+    srun "${build_dir}/pi_mpi" --steps 100000000
 
     echo "== Memory kernel for ${toolchain} =="
     srun "${build_dir}/memory_stream" --mib-per-rank 64 --iters 8
 
     echo "== Collective kernel for ${toolchain} =="
-    srun "${build_dir}/allreduce_benchmark" --max-bytes 1M --iters 50 --warmup 5
+    srun "${build_dir}/collective_cost" --max-bytes 1M --iters 50 --warmup 5
 done
