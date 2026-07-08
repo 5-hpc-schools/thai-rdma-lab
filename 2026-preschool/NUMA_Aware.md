@@ -246,7 +246,6 @@ EOF_C
 ให้ compile ด้วยคำสั่งนี้
 
 ```bash
-module reset
 module list
 
 cc --version
@@ -279,7 +278,6 @@ cat > 00_check_topology.sbatch <<'EOF_SBATCH'
 #SBATCH -A tn999992
 #SBATCH -o 00_check_topology_%j.out
 
-module reset
 
 echo "===== Job information ====="
 echo "HOSTNAME=${HOSTNAME}"
