@@ -1,0 +1,40 @@
+x1000c2s1b0n1:3714714:3715441 [2] NCCL INFO Using network Socket
+x1000c2s1b0n1:3714714:3715440 [1] NCCL INFO Using network Socket
+x1000c2s1b0n1:3714714:3715439 [0] NCCL INFO Using network Socket
+x1000c2s1b0n1:3714714:3715442 [3] NCCL INFO Using network Socket
+x1000c2s1b0n1:3714714:3715439 [0] NCCL INFO Pattern 4, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+x1000c2s1b0n1:3714714:3715439 [0] NCCL INFO Pattern 1, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+x1000c2s1b0n1:3714714:3715442 [3] NCCL INFO Pattern 4, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+x1000c2s1b0n1:3714714:3715442 [3] NCCL INFO Pattern 1, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+x1000c2s1b0n1:3714714:3715441 [2] NCCL INFO Pattern 4, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+x1000c2s1b0n1:3714714:3715440 [1] NCCL INFO Pattern 4, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+x1000c2s1b0n1:3714714:3715441 [2] NCCL INFO Pattern 1, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+x1000c2s1b0n1:3714714:3715440 [1] NCCL INFO Pattern 1, crossNic 0, nChannels 12, bw 20.000000/20.000000, type NVL/PIX, sameChannels 0
+           8             2     float     sum      -1    14.85    0.00    0.00      0    14.93    0.00    0.00      0
+          16             4     float     sum      -1    15.63    0.00    0.00      0    14.84    0.00    0.00      0
+          32             8     float     sum      -1    15.58    0.00    0.00      0    14.88    0.00    0.00      0
+          64            16     float     sum      -1    15.58    0.00    0.01      0    15.08    0.00    0.01      0
+         128            32     float     sum      -1    15.54    0.01    0.01      0    14.88    0.01    0.01      0
+         256            64     float     sum      -1    15.33    0.02    0.03      0    15.03    0.02    0.03      0
+         512           128     float     sum      -1    15.40    0.03    0.05      0    15.05    0.03    0.05      0
+        1024           256     float     sum      -1    16.21    0.06    0.09      0    15.10    0.07    0.10      0
+        2048           512     float     sum      -1    16.17    0.13    0.19      0    15.65    0.13    0.20      0
+        4096          1024     float     sum      -1    16.80    0.24    0.37      0    16.15    0.25    0.38      0
+        8192          2048     float     sum      -1    17.95    0.46    0.68      0    17.09    0.48    0.72      0
+       16384          4096     float     sum      -1    19.96    0.82    1.23      0    18.56    0.88    1.32      0
+       32768          8192     float     sum      -1    21.15    1.55    2.32      0    20.14    1.63    2.44      0
+       65536         16384     float     sum      -1    21.72    3.02    4.52      0    20.73    3.16    4.74      0
+      131072         32768     float     sum      -1    21.42    6.12    9.18      0    21.20    6.18    9.27      0
+      262144         65536     float     sum      -1    22.20   11.81   17.71      0    21.27   12.32   18.49      0
+      524288        131072     float     sum      -1    26.46   19.81   29.72      0    25.78   20.33   30.50      0
+     1048576        262144     float     sum      -1    50.78   20.65   30.97      0    50.39   20.81   31.21      0
+     2097152        524288     float     sum      -1    62.43   33.59   50.38      0    62.60   33.50   50.25      0
+     4194304       1048576     float     sum      -1    92.89   45.15   67.73      0    92.54   45.33   67.99      0
+     8388608       2097152     float     sum      -1    123.4   67.96  101.94      0    122.1   68.69  103.04      0
+    16777216       4194304     float     sum      -1    199.3   84.18  126.26      0    197.5   84.95  127.42      0
+    33554432       8388608     float     sum      -1    326.7  102.71  154.07      0    325.3  103.16  154.73      0
+    67108864      16777216     float     sum      -1    626.0  107.21  160.81      0    626.3  107.16  160.74      0
+   134217728      33554432     float     sum      -1   1182.8  113.48  170.21      0   1164.3  115.28  172.92      0
+   268435456      67108864     float     sum      -1   2275.2  117.98  176.98      0   2125.3  126.31  189.46      0
+   536870912     134217728     float     sum      -1   3739.0  143.59  215.38      0   3736.2  143.70  215.54      0
+# Avg bus bandwidth    : 49.3041 

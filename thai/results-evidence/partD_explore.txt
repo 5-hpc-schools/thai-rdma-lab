@@ -1,0 +1,25 @@
+############ (1) PROTOCOLS : Simple vs LL vs LL128 ############
+-- NCCL_PROTO=Simple --
+  size=1048576   busbw=21.06 GB/s
+  size=67108864  busbw=169.17 GB/s
+-- NCCL_PROTO=LL --
+  size=1048576   busbw=42.08 GB/s
+  size=67108864  busbw=71.23 GB/s
+-- NCCL_PROTO=LL128 --
+  size=1048576   busbw=31.03 GB/s
+  size=67108864  busbw=123.18 GB/s
+############ (2) ALGORITHM : Ring vs Tree ############
+-- NCCL_ALGO=Ring --
+  size=1048576   busbw=30.75 GB/s
+  size=67108864  busbw=168.90 GB/s
+-- NCCL_ALGO=Tree --
+  size=1048576   busbw=29.23 GB/s
+  size=67108864  busbw=131.75 GB/s
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/81000
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/C1000
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/41000
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/81000
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/C1000
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/3000
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/C1000
+x1000c3s6b0n1:1148265:1148286 [1] NCCL INFO               + NVL[80.0] - GPU/41000

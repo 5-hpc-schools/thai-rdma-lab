@@ -1,0 +1,11 @@
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:-- RING --
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:     1048576        262144     float     sum      -1    50.73   20.67   31.00      0    50.70   20.68   31.02      0
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:     8388608       2097152     float     sum      -1    123.5   67.93  101.90      0    121.4   69.10  103.64      0
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:    67108864      16777216     float     sum      -1    583.6  114.99  172.49      0    580.9  115.53  173.29      0
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:# Avg bus bandwidth    : 102.225 
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:-- TREE --
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:     1048576        262144     float     sum      -1    53.41   19.63   29.45      0    53.55   19.58   29.37      0
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:     8388608       2097152     float     sum      -1    182.1   46.06   69.10      0    180.8   46.41   69.61      0
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:    67108864      16777216     float     sum      -1    761.5   88.13  132.19      0    763.9   87.85  131.77      0
+/project/tn999992-rdma/day3-nccl-lab/results/verifyDE_5978068.out:# Avg bus bandwidth    : 76.9153 
+/project/tn999992-rdma/day3-nccl-lab/results/verE_5978083.out:RESULT OK
