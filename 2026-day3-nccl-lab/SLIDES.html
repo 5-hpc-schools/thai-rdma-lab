@@ -1,0 +1,255 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Make GPUs Talk — Day 3</title><style>
+*{box-sizing:border-box} html,body{margin:0;height:100%;background:#0b1020;color:#e8eef7;
+font:28px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+#deck{height:100vh;width:100vw}
+.slide{display:none;height:100vh;width:100vw;padding:4vh 6vw;flex-direction:column;justify-content:center;overflow:auto}
+.slide.on{display:flex}
+.slide.title{align-items:center;text-align:center}
+h1{font-size:2.0em;color:#5ee6a8;margin:.2em 0;line-height:1.1}
+h2{font-size:1.5em;color:#5ee6a8;margin:.1em 0 .4em;border-bottom:2px solid #24406a;padding-bottom:.2em}
+h3{font-size:1.1em;color:#7fd1ff;margin:.3em 0}
+p,li{font-size:1.0em;margin:.3em 0}
+strong{color:#ffd54a}
+code{background:#16233d;color:#9fe0ff;padding:.05em .3em;border-radius:4px;font-family:ui-monospace,Consolas,monospace;font-size:.9em}
+pre{background:#050a14;border:1px solid #24406a;border-radius:10px;padding:.8rem 1rem;overflow:auto;font-size:.62em;line-height:1.35}
+pre code{background:none;color:#c9e6ff;padding:0}
+table{border-collapse:collapse;margin:.5em 0;font-size:.85em}
+th,td{border:1px solid #24406a;padding:.35rem .7rem} th{background:#16233d;color:#7fd1ff}
+blockquote{background:#132a1e;border-left:6px solid #5ee6a8;padding:.5rem 1rem;border-radius:6px;font-size:.9em;color:#cdeede}
+ul{margin:.2em 0 .2em 1em}
+#bar{position:fixed;bottom:0;left:0;height:5px;background:#5ee6a8;transition:width .2s}
+#num{position:fixed;bottom:12px;right:20px;font-size:16px;color:#5a7099}
+.hint{position:fixed;bottom:12px;left:20px;font-size:15px;color:#3f5478}
+#theme{position:fixed;top:12px;right:16px;z-index:10;background:#16233d;color:#e8eef7;border:1px solid #24406a;
+border-radius:20px;padding:.3em .8em;font-size:15px;cursor:pointer}
+/* dense decks (--by-heading): smaller text so more fits per slide */
+body.dense{font-size:24px} body.dense .slide{justify-content:flex-start;padding-top:3vh}
+body.dense pre{font-size:.66em}
+/* ---- LIGHT THEME ---- */
+body.light{background:#f6f8fc;color:#1a2333}
+body.light h1,body.light h2{color:#0a7a4f;border-color:#cfe0d6}
+body.light h3{color:#0b6bb0}
+body.light strong{color:#b06a00}
+body.light code{background:#e7edf6;color:#0b5a94}
+body.light pre{background:#0e1626;border-color:#c3d0e2}   /* keep logs dark for contrast */
+body.light th{background:#e7f2ec;color:#0b6bb0} body.light td,body.light th{border-color:#cfdae8}
+body.light blockquote{background:#eefaf2;color:#215c3e;border-color:#3fae7a}
+body.light #num{color:#8091a8} body.light .hint{color:#a9b6c8}
+body.light #theme{background:#e7edf6;color:#1a2333;border-color:#c3d0e2}
+@media print{html,body{overflow:visible;height:auto} .slide{display:flex!important;page-break-after:always;height:100vh;border-bottom:1px solid #ccc} #bar,#num,.hint,#theme{display:none}}
+</style></head><body class="">
+<button id="theme">◐ Light</button>
+<div id="deck"><section class="slide title"><h1>Make GPUs Talk</h1>
+<h2>Day 3 — NCCL, RDMA, and how AI trains on many GPUs</h2>
+
+<p>use ← → arrows (or click) to move</p></section><section class="slide"><h2>Why are we here?</h2>
+
+<ul><li>A <strong>GPU</strong> is a very fast calculator for AI.</li><li>One GPU is <strong>too small</strong> for a big AI model.</li><li>So we use <strong>many GPUs</strong> together.</li><li><strong>The problem:</strong> they must <strong>share their numbers</strong> — fast.</li></ul>
+
+<blockquote>Slow sharing = GPUs wait = wasted money. Today: <strong>how fast can GPUs share?</strong></blockquote></section><section class="slide"><h2>The job: all-reduce</h2>
+
+<p>Four students each added part of a list:</p>
+
+<pre><code>   A = 10      B = 20
+   C = 30      D = 40</code></pre>
+
+<p>Everyone needs the <strong>total = 100</strong>. So they talk and add.</p>
+
+<p><strong>all-reduce</strong> = everyone adds, everyone gets the sum. It is the #1 job in AI training.</p></section><section class="slide"><h2>The number we watch: busbw</h2>
+
+<ul><li><strong>busbw</strong> = bus bandwidth, in <strong>GB/s</strong>.</li><li>Think of a water pipe: fatter pipe = more water per second.</li><li><strong>Bigger busbw = faster = better.</strong> That is all you need.</li></ul></section><section class="slide"><h2>How to run (only 4 commands)</h2>
+
+<table><thead><tr><th>command</th><th>meaning</th></tr></thead><tbody><tr><td><code>sbatch job.sbatch</code></td><td>send job to the queue</td></tr><tr><td><code>squeue -u $USER</code></td><td>PD = waiting, R = running, empty = done</td></tr><tr><td><code>cat name_*.out</code></td><td>read the answer</td></tr><tr><td><code>scancel &lt;id&gt;</code></td><td>cancel</td></tr></tbody></table></section><section class="slide title"><h1>Part A</h1>
+<h2>4 GPUs in ONE box — NVLink</h2></section><section class="slide"><h2>Inside one box: NVLink</h2>
+
+<pre><code>   ┌──────── one node (one box) ────────┐
+   │  GPU0 ══ GPU1 ══ GPU2 ══ GPU3       │
+   │     ══ NVLink (very fast) ══        │
+   └────────────────────────────────────┘</code></pre>
+
+<p>Like 4 friends at the <strong>same table</strong>, passing papers by hand. No network.</p></section><section class="slide"><h2>Part A result</h2>
+
+<ul><li>busbw ≈ <strong>215 GB/s</strong> — HUGE.</li><li>Log shows <code>type NVL</code> = NVLink was used.</li></ul>
+
+<blockquote>Why so fast? A <strong>direct wire</strong> on the board. No cable, no copies.</blockquote></section><section class="slide title"><h1>Part B</h1>
+<h2>2 boxes — the Slingshot network (RDMA)</h2></section><section class="slide"><h2>Between boxes: the network</h2>
+
+<pre><code>   ┌─ node 1 ─┐     Slingshot     ┌─ node 2 ─┐
+   │  GPU ●────┼═════ cable ═══════┼────● GPU │
+   └──────────┘                   └──────────┘</code></pre>
+
+<p>Friends in <strong>different buildings</strong> now — they must <strong>send mail</strong>.</p>
+
+<p><strong>RDMA</strong> = the network card reads GPU memory <strong>directly</strong> (no CPU copy).</p>
+<p>Like a courier who walks in and grabs the box.</p></section><section class="slide"><h2>✋ Guess first</h2>
+
+<p>Part A (NVLink) was <strong>~200 GB/s</strong>.</p>
+
+<p>The network in Part B — <strong>faster or slower?</strong></p>
+
+<p>*(write your guess, then we run it)*</p></section><section class="slide"><h2>Part B result</h2>
+
+<ul><li>busbw ≈ <strong>9 GB/s</strong>.</li><li>Log proof:</li></ul>
+
+<pre><code>NET/OFI Selected provider is cxi   (found 1 nics)
+Channel 00 : 0 -&gt; 1 [send] via NET/OFI/0</code></pre>
+
+<blockquote>Slower than NVLink — a long cable can&#x27;t beat an on-board wire. But it is real RDMA.</blockquote></section><section class="slide title"><h1>Part C</h1>
+<h2>Same cable, but SLOW on purpose (TCP)</h2></section><section class="slide"><h2>TCP: the slow way</h2>
+
+<ul><li>Turn RDMA <strong>off</strong> → plain <strong>TCP</strong> (<code>NCCL_NET=Socket</code>).</li><li>Now the <strong>CPU copies every byte</strong>.</li><li>Like a post office that <strong>re-copies</strong> your box at every desk.</li></ul></section><section class="slide"><h2>The headline result 🏆</h2>
+
+<table><thead><tr><th>path</th><th>busbw</th></tr></thead><tbody><tr><td>Part B — RDMA</td><td><strong>~9 GB/s</strong></td></tr><tr><td>Part C — TCP</td><td><strong>~1.8 GB/s</strong></td></tr></tbody></table>
+
+<h2>RDMA is ~<strong>5× faster</strong> than TCP — on the SAME cable.</h2>
+
+<blockquote>This 5× is the whole reason AI clusters buy RDMA networks.</blockquote></section><section class="slide title"><h1>Part D</h1>
+<h2>🔍 Look inside NCCL</h2></section><section class="slide"><h2>Protocols: how to pack the data</h2>
+
+<ul><li><strong>LL</strong> = a postcard. Tiny, instant. Best for <strong>small</strong>.</li><li><strong>LL128</strong> = a padded envelope. Middle.</li><li><strong>Simple</strong> = a big truck. Best for <strong>big</strong>.</li></ul></section><section class="slide"><h2>Protocols — the crossover</h2>
+
+<table><thead><tr><th>protocol</th><th>at 1 MB</th><th>at 64 MB</th></tr></thead><tbody><tr><td>Simple</td><td>~21</td><td><strong>~169</strong> ✅</td></tr><tr><td>LL</td><td><strong>~42</strong> ✅</td><td>~71</td></tr><tr><td>LL128</td><td>~31</td><td>~123</td></tr></tbody></table>
+
+<p><strong>Postcard wins small. Truck wins big.</strong> No single best — so NCCL switches for you.</p></section><section class="slide"><h2>Shape: Ring vs Tree</h2>
+
+<pre><code>   Ring 🔄            Tree 🌳
+   0 → 1             (0+1) ┐
+   ↑    ↓                  ├─ sum
+   3 ← 2             (2+3) ┘</code></pre>
+
+<ul><li><strong>Ring</strong> — pass around a circle. Best for <strong>big</strong>.</li><li><strong>Tree</strong> — add like a tournament. Best for <strong>small</strong>.</li></ul>
+
+<p>Big data: <strong>Ring ~102</strong> vs <strong>Tree ~77</strong> GB/s.</p></section><section class="slide"><h2>The machine map (topology)</h2>
+
+<pre><code>=== System : maxBw 80.0  totalBw 240.0 ===
+GPU/3000  + NVL[80.0] - GPU/81000
+          + NVL[80.0] - GPU/c1000
+          + NVL[80.0] - GPU/41000</code></pre>
+
+<p>Every GPU has an <strong>80 GB/s NVLink</strong> to every other = all-to-all (an NVSwitch).</p></section><section class="slide"><h2>NVLS — could the switch do the math?</h2>
+
+<pre><code>NVLS multicast support is not available</code></pre>
+
+<p><strong>NVLS</strong> = the NVSwitch chip <strong>adds the numbers itself</strong>, in the wires — no GPU has to receive-add-resend.</p>
+<p>Very fast, but needs newer GPUs (H100). On these A100s it is off → NCCL uses Ring/Tree instead.</p></section><section class="slide title"><h1>Part E</h1>
+<h2>✍️ Now YOU write NCCL code</h2></section><section class="slide"><h2>Fill 2 lines</h2>
+
+<pre><code>ncclCommInitAll(comm, nGPU, devs);              // make the team
+ncclAllReduce(send, recv, N, ncclFloat,
+              ncclSum, comm[g], stream[g]);      // add + share</code></pre>
+
+<p>4 GPUs start with 0,1,2,3 → after all-reduce each holds <strong>6</strong>.</p></section><section class="slide"><h2>It works ✅</h2>
+
+<pre><code>GPU0 after all-reduce: 6 6 6 ...
+RESULT OK</code></pre>
+
+<blockquote>That <code>ncclAllReduce</code> is the <strong>exact call</strong> that trains real AI on thousands of GPUs.</blockquote></section><section class="slide"><h2>all-reduce is one of a family</h2>
+
+<table><thead><tr><th>collective</th><th>what it does</th></tr></thead><tbody><tr><td><strong>AllReduce</strong></td><td>everyone adds, everyone gets the total</td></tr><tr><td><strong>Broadcast</strong></td><td>one GPU&#x27;s data → copied to all</td></tr><tr><td><strong>Reduce</strong></td><td>everyone adds → only rank 0 keeps it</td></tr><tr><td><strong>AllGather</strong></td><td>everyone collects everyone&#x27;s piece</td></tr><tr><td><strong>ReduceScatter</strong></td><td>add, then split the result across GPUs</td></tr></tbody></table>
+
+<p>Training an AI = <strong>AllReduce the gradients</strong>, millions of times.</p></section><section class="slide title"><h1>Part F</h1>
+<h2>🔬 The first 100 milliseconds</h2>
+
+<p>Before it moves ONE byte, NCCL does 5 things.</p></section><section class="slide"><h2>First: how to read a log line</h2>
+
+<pre><code>x1001c4s7b0n1:2678741:2679205 [2] NCCL INFO Selected provider is cxi
+ └── host ──┘ └pid─┘ └tid─┘ [GPU]  └──── message ────┘</code></pre>
+
+<ul><li><strong><code>[2]</code></strong> = which GPU printed it. Follow <strong>one</strong> GPU&#x27;s story in the mess.</li><li><strong><code>NCCL INFO</code></strong> = normal. <strong><code>NCCL WARN</code></strong> = stop and read it.</li></ul></section><section class="slide"><h2>Step 1 · Handshake 🤝</h2>
+
+<pre><code>Bootstrap : Using hsn0:10.150.1.8
+comm rank 2 nranks 4 ... commId 0x51677f56... - Init START</code></pre>
+
+<ul><li>Everyone gets the <strong>same team secret</strong> (<code>commId</code>).</li><li>They swap addresses over a slow &quot;hello&quot; network.</li></ul></section><section class="slide"><h2>Step 2 · Draw the map 🗺️</h2>
+
+<pre><code>=== System : maxBw 80.0 totalBw 240.0 ===
++ NVL[80.0] - GPU/81000</code></pre>
+
+<p>NCCL probes every GPU, link, and CPU → the map it plans on.</p></section><section class="slide"><h2>Step 3 · Plan routes 🧭</h2>
+
+<pre><code>nChannels 12
+Ring 00 : 2 -&gt; 3 -&gt; 0
+Tree 12 : -1 -&gt; 0 -&gt; 1</code></pre>
+
+<p>12 rings + 12 trees — many parallel lanes.</p></section><section class="slide"><h2>Step 4 · Open the roads 🚧</h2>
+
+<pre><code>Channel 00 : 1 -&gt; 2 via P2P/direct pointer/read
+Connected all rings</code></pre>
+
+<p>Pick a transport per link: <strong>P2P</strong> (NVLink) or <strong>NET/OFI</strong> (Slingshot RDMA).</p></section><section class="slide"><h2>Step 5 · The cheat-sheet 📋</h2>
+
+<pre><code>Algorithm | Tree | Ring | ...
+AllReduce | 10.4µs/29 | ... | 28.8µs/160 |
+             latency / bandwidth</code></pre>
+
+<p>NCCL predicts every option&#x27;s speed → picks the best per size. <strong>This is why Part D happened.</strong></p></section><section class="slide"><h2>The proxy: the GPU&#x27;s CPU helper</h2>
+
+<p>The GPU is great at math, <strong>bad at waiting</strong>. So each GPU gets a CPU helper thread — the <strong>proxy</strong>.</p>
+
+<ul><li>GPU: &quot;send chunk 5&quot; → then keeps doing <strong>math</strong> on chunk 6</li><li>Proxy: pushes chunk 5 to the NIC / Slingshot, reports back &quot;done&quot;</li></ul>
+
+<p>This overlap = the GPU <strong>never stops</strong>. (The proxy is who actually touches RDMA.)</p></section><section class="slide"><h2>Ring all-reduce, the trick</h2>
+
+<p>Split data into N parts. Two phases, each N−1 steps:</p>
+
+<ul><li><strong>reduce-scatter</strong> — pass &amp; add; each GPU ends owning one full sum.</li><li><strong>all-gather</strong> — circulate the finished parts to everyone.</li></ul>
+
+<p>Each GPU moves only <strong>~2× the data</strong>, no matter how many GPUs → busbw stays high.</p></section><section class="slide title"><h1>From Python to RDMA</h1>
+<h2>and PyTorch DDP</h2></section><section class="slide"><h2>The layer cake</h2>
+
+<pre><code> your Python   loss.backward()
+     │
+ torch.distributed   (backend=&quot;nccl&quot;)
+     │
+ NCCL     ← everything you saw today
+     │
+ aws-ofi-nccl → libfabric → cxi
+     │
+ Slingshot NIC   = RDMA</code></pre>
+
+<p>You never write RDMA. You call PyTorch; RDMA happens below.</p></section><section class="slide"><h2>DDP: automatic all-reduce</h2>
+
+<pre><code>model = DDP(model)          # wrap it
+loss.backward()             # DDP all-reduces the gradients HERE
+optimizer.step()            # every GPU: same averaged gradient</code></pre>
+
+<p>Training on N GPUs = same as 1 GPU, because all-reduce keeps them identical.</p></section><section class="slide"><h2>&quot;Can I call RDMA directly from Python?&quot;</h2>
+
+<p>There is no <code>import rdma</code>. RDMA is a hardware power you reach through a library:</p>
+
+<table><thead><tr><th>you want</th><th>use</th></tr></thead><tbody><tr><td>GPU collectives (AI)</td><td><strong>PyTorch <code>dist</code></strong> (= NCCL)</td></tr><tr><td>CPU messaging</td><td><strong>mpi4py</strong></td></tr><tr><td>one-sided put/get</td><td><strong>UCX-Py</strong> (<code>ucp</code>)</td></tr><tr><td>raw verbs</td><td><strong>pyverbs</strong></td></tr></tbody></table>
+
+<p>99% of AI = <strong>PyTorch → NCCL → RDMA</strong>. You already used it today.</p></section><section class="slide"><h2>We ran it — Python used RDMA ✅</h2>
+
+<p>From a pure <strong>Python</strong> DDP program on 2 nodes, the NCCL log printed:</p>
+
+<pre><code>NET/OFI Selected provider is cxi (found 1 nics)
+Channel 00 : 3 -&gt; 4 [send] via NET/OFI/0/GDRDMA</code></pre>
+
+<p><strong>GDRDMA</strong> = the Slingshot card read GPU memory directly. Your <code>loss.backward()</code> rode RDMA.</p></section><section class="slide"><h2>When it breaks — grep this 🔧</h2>
+
+<table><thead><tr><th>symptom</th><th>first thing to check</th></tr></thead><tbody><tr><td><strong>hang</strong></td><td>did every rank reach <code>Init COMPLETE</code>?</td></tr><tr><td><strong>slow</strong></td><td>is it picking Ring/Simple for big messages?</td></tr><tr><td><strong><code>Device or resource busy</code></strong></td><td>a network / transport setup issue — not your math</td></tr><tr><td><strong>wrong answer</strong></td><td>a bug in your code, not NCCL</td></tr></tbody></table>
+
+<p>Reading the log <strong>is</strong> the skill.</p></section><section class="slide"><h2>What you learned 🎓</h2>
+
+<ul><li>GPUs share numbers with <strong>all-reduce</strong>.</li><li>Inside a box: <strong>NVLink</strong> (~200 GB/s). Between boxes: <strong>Slingshot RDMA</strong>.</li><li><strong>RDMA ≈ 5× faster than TCP</strong> — same cable.</li><li>NCCL picks <strong>protocol</strong> (LL/Simple) and <strong>shape</strong> (Ring/Tree) for you.</li><li>You wrote <code>ncclAllReduce</code>, read a real NCCL log, and traced Python → RDMA.</li></ul></section><section class="slide title"><h1>Thank you 👏</h1>
+<h2>You can now read a raw NCCL log — a rare, real skill.</h2>
+
+<p>Guides: <code>LAB.html</code> · <code>FIELDGUIDE.html</code> · <code>PYTORCH_RDMA.html</code></p></section></div>
+<div id="bar"></div><div id="num"></div><div class="hint">← → move · click sides · button = theme · Ctrl-P = PDF</div>
+<script>
+const S=[...document.querySelectorAll('.slide')];let c=0;
+function show(n){c=Math.max(0,Math.min(S.length-1,n));S.forEach((s,i)=>s.classList.toggle('on',i===c));
+document.getElementById('bar').style.width=((c+1)/S.length*100)+'%';
+document.getElementById('num').textContent=(c+1)+' / '+S.length;location.hash=c+1;}
+document.addEventListener('keydown',e=>{if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){show(c+1);e.preventDefault();}
+else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){show(c-1);e.preventDefault();}
+else if(e.key==='Home')show(0);else if(e.key==='End')show(S.length-1);});
+document.getElementById('deck').addEventListener('click',e=>{if(e.clientX>window.innerWidth*0.35)show(c+1);else show(c-1);});
+// theme toggle (remembers your choice)
+const tb=document.getElementById('theme');
+function setTheme(l){document.body.classList.toggle('light',l);tb.textContent=l?'◑ Dark':'◐ Light';try{localStorage.setItem('deckLight',l?'1':'0')}catch(e){}}
+tb.addEventListener('click',()=>setTheme(!document.body.classList.contains('light')));
+setTheme((()=>{try{return localStorage.getItem('deckLight')==='1'}catch(e){return false}})());
+show((parseInt(location.hash.slice(1))||1)-1);
+</script></body></html>

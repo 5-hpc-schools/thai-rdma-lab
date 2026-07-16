@@ -1,0 +1,36 @@
+8:x1000c2s1b0n1:3352496:3352496 [0] NCCL INFO Bootstrap : Using hsn0:10.150.1.8<0>
+14:x1000c2s2b0n1:1625803:1625803 [0] NCCL INFO Bootstrap : Using hsn0:10.150.1.12<0>
+25:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO NET/OFI Selected provider is cxi, fabric is cxi (found 1 nics)
+41:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO NET/OFI Selected provider is cxi, fabric is cxi (found 1 nics)
+53:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO comm 0x1a06a00 rank 1 nranks 2 cudaDev 0 nvmlDev 0 busId 3000 commId 0x51677f56986aa0d3 - Init START
+54:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO comm 0x1a07270 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 3000 commId 0x51677f56986aa0d3 - Init START
+55:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO NET/OFI : GPU Direct RDMA Enabled for HCA 0 'cxi0'
+56:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO NET/OFI : GPU Direct RDMA Enabled for HCA 0 'cxi0'
+58:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+59:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+78:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+79:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+121:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+126:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+146:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[0] [receive] via NET/OFI/0
+148:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+159:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[0] [receive] via NET/OFI/0
+160:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+171:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO Channel 00/0 : 1[0] -> 0[0] [send] via NET/OFI/0
+172:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+183:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO Channel 01/0 : 1[0] -> 0[0] [send] via NET/OFI/0
+188:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO Channel 00/0 : 1[0] -> 0[0] [receive] via NET/OFI/0
+189:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+200:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO Channel 01/0 : 1[0] -> 0[0] [receive] via NET/OFI/0
+201:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+212:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[0] [send] via NET/OFI/0
+213:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+224:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[0] [send] via NET/OFI/0
+282:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO Connected all rings
+283:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO Connected all trees
+299:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO Connected all rings
+300:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO Connected all trees
+338:x1000c2s2b0n1:1625803:1626563 [0] NCCL INFO comm 0x1a06a00 rank 1 nranks 2 cudaDev 0 nvmlDev 0 busId 3000 commId 0x51677f56986aa0d3 - Init COMPLETE
+341:x1000c2s1b0n1:3352496:3353181 [0] NCCL INFO comm 0x1a07270 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 3000 commId 0x51677f56986aa0d3 - Init COMPLETE
+1183:x1000c2s2b0n1:1625803:1625803 [0] NCCL INFO comm 0x1a06a00 rank 1 nranks 2 cudaDev 0 busId 3000 - Destroy COMPLETE
+1184:x1000c2s1b0n1:3352496:3352496 [0] NCCL INFO comm 0x1a07270 rank 0 nranks 2 cudaDev 0 busId 3000 - Destroy COMPLETE

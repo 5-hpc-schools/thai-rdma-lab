@@ -1,0 +1,472 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NCCL Field Guide</title><style>
+body{font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:820px;margin:2rem auto;padding:0 1.2rem;color:#1a1a2e}
+h1{color:#0b5;border-bottom:3px solid #0b5;padding-bottom:.3rem}
+h2{color:#087;margin-top:2rem;border-bottom:1px solid #cde}
+h3{color:#0a6}
+code{background:#f4f6f8;padding:.1em .35em;border-radius:4px;font-family:ui-monospace,Consolas,monospace;font-size:.92em}
+pre{background:#0f1720;color:#d6e2f0;padding:.9rem 1rem;border-radius:8px;overflow-x:auto}
+pre code{background:none;color:inherit;padding:0}
+table{border-collapse:collapse;margin:1rem 0;width:100%}
+th,td{border:1px solid #cde;padding:.45rem .7rem;text-align:left}
+th{background:#eaf7f1}
+blockquote{background:#fff8e1;border-left:5px solid #f5b301;margin:1rem 0;padding:.6rem 1rem;border-radius:4px}
+hr{border:none;border-top:1px solid #dde;margin:2rem 0}
+a{color:#087}
+</style></head><body>
+<h1>NCCL Field Guide — read the log like a pro</h1>
+
+<p>This is the <strong>big picture</strong> companion to the lab. In Part F you turned on the full NCCL log.</p>
+<p>Here we explain <strong>every part of it</strong>, from zero. You do not need any background. Each topic has:</p>
+<p>a plain explanation, a <strong>real line from the log</strong>, and a <strong>💬 talk-about-it</strong> question.</p>
+
+<p>Turn on the full log any time with:</p>
+
+<pre><code>export NCCL_DEBUG=INFO
+export NCCL_DEBUG_SUBSYS=ALL</code></pre>
+
+<hr>
+
+<h2>0 · How to read ONE log line</h2>
+
+<p>Every line looks like this:</p>
+
+<pre><code>x1001c4s7b0n1:2678741:2679205 [2] NCCL INFO Selected provider is cxi
+└──── host ────┘ └─pid─┘ └─tid─┘ └GPU┘ └tag┘ └───── message ─────┘</code></pre>
+
+<ul><li><strong>host</strong> = which box (node) printed it.</li><li><strong>pid / tid</strong> = which process / thread.</li><li><strong><code>[2]</code></strong> = which <strong>GPU</strong> on that box (GPU 2).</li><li><strong><code>NCCL INFO</code></strong> = a normal message. (<code>NCCL WARN</code> = a warning. Read those carefully.)</li></ul>
+
+<p>💬 *Why does NCCL print the GPU number in every line?* (Hint: 4–16 GPUs all print at once; the</p>
+<p>number lets you follow ONE GPU&#x27;s story in the mess.)</p>
+
+<hr>
+
+<h2>1 · Rank, device, communicator — the 3 words you must know</h2>
+
+<ul><li><strong>GPU / device</strong> = one physical card.</li><li><strong>rank</strong> = a GPU&#x27;s <strong>seat number</strong> in the team (0, 1, 2, …). Rank 0 is the &quot;leader&quot;.</li><li><strong>communicator (<code>comm</code>)</strong> = the <strong>team object</strong>. It holds the plan (rings, trees, buffers).</li></ul>
+
+<p>Real line:</p>
+
+<pre><code>comm 0x3c75f60 rank 2 nranks 4 cudaDev 2 nvmlDev 2 busId 81000 commId 0xad5f74829cf1c8d3 - Init START</code></pre>
+
+<ul><li><code>rank 2</code> of <code>nranks 4</code> → seat 2 of a 4-GPU team.</li><li><code>cudaDev 2</code> → it is physical GPU 2.</li><li><code>busId 81000</code> → the GPU&#x27;s hardware address on the board.</li><li><code>commId 0xad5f…</code> → the <strong>team secret</strong> (see §2). Every teammate shows the same one.</li></ul>
+
+<p>💬 *Rank and cudaDev are both &quot;2&quot; here — will they always match?* (No. On many nodes, rank 6</p>
+<p>might be GPU 2 of node 1. Rank = seat in the team; cudaDev = card in one box.)</p>
+
+<hr>
+
+<h2>2 · The handshake (bootstrap) — how strangers become a team</h2>
+
+<p>At the start, the GPUs do <strong>not</strong> know each other. They have never met. Bootstrap is the</p>
+<p>&quot;exchange phone numbers&quot; step. It happens in 4 moves:</p>
+
+<ol><li><strong>Make a ticket.</strong> Rank 0 calls <code>ncclGetUniqueId</code>. This ticket holds rank 0&#x27;s address and a</li></ol>
+<p>   random secret (the <code>commId</code>).</p>
+<ol><li><strong>Share the ticket.</strong> The ticket is copied to every rank (by MPI, or a file). Now everyone</li></ol>
+<p>   knows how to reach rank 0.</p>
+<ol><li><strong>Call the leader.</strong> Every rank opens a plain TCP socket to rank 0. They line up into a</li></ol>
+<p>   <strong>bootstrap ring</strong> (0→1→2→3→0).</p>
+<ol><li><strong>Swap all addresses.</strong> Going around the ring, every rank learns every other rank&#x27;s address.</li></ol>
+<p>   Now the team is formed.</p>
+
+<p>Real lines:</p>
+
+<pre><code>Bootstrap : Using bond0:10.168.4.6&lt;0&gt;
+NET/Socket : Using [0]bond0 [1]hsn0 [2]hsn1
+comm 0x3c75f60 rank 2 ... commId 0xad5f74829cf1c8d3 - Init START
+comm 0x3c75f60 rank 2 ... commId 0xad5f74829cf1c8d3 - Init COMPLETE</code></pre>
+
+<ul><li><strong><code>bond0</code></strong> = a plain, slow office network. Bootstrap uses it because saying &quot;hello&quot; is tiny.</li></ul>
+<p>  ⚠️ The real AI data will NOT go here — it uses NVLink or Slingshot RDMA (see §7).</p>
+<p>  (On a <strong>2-node</strong> run the hello uses <code>hsn0</code> instead — real line:</p>
+<p>  <code>Bootstrap : Using hsn0:10.150.1.8&lt;0&gt;</code>, commId <code>0x51677f56986aa0d3</code> shared by both nodes.)</p>
+<ul><li><strong><code>commId</code></strong> = the team secret. If two different teams accidentally used the same one, they</li></ul>
+<p>  would try to join → chaos. That is why it is random.</p>
+<ul><li><strong><code>Init START … Init COMPLETE</code></strong> = the whole setup (§2–§11) happens between these two lines.</li></ul>
+
+<p>💬 *Why use a slow network (<code>bond0</code>) just to say hello, instead of the fast one?* (The fast NICs</p>
+<p>are busy and precious; a handshake is a few bytes, once. Do not waste the highway on a postcard.)</p>
+
+<p>💬 *What breaks if step 2 fails and one rank never gets the ticket?* (That rank never joins; the</p>
+<p>others wait for it forever → the classic &quot;NCCL hang&quot;. This is why hangs often mean a bootstrap /</p>
+<p>network-setup problem, not a math problem.)</p>
+
+<hr>
+
+<h2>3 · The machine map (topology)</h2>
+
+<p>Before planning, each GPU <strong>explores the hardware</strong> and writes a map: every GPU, every link,</p>
+<p>every CPU, and how fast each connection is.</p>
+
+<pre><code>=== System : maxBw 80.0 totalBw 240.0 ===
++ PCI[24.0] - GPU/3000 (0)
+              + NVL[80.0] - GPU/81000
+              + NVL[80.0] - GPU/C1000
+              + NVL[80.0] - GPU/41000</code></pre>
+
+<p>The words in <code>[]</code> are <strong>link types</strong>, fastest to slowest:</p>
+
+<table><thead><tr><th>tag</th><th>meaning</th><th>speed here</th></tr></thead><tbody><tr><td><code>NVL</code></td><td>NVLink (GPU↔GPU direct wire)</td><td>80 GB/s</td></tr><tr><td><code>PIX</code></td><td>through one PCI switch</td><td>fast</td></tr><tr><td><code>PXB</code></td><td>through several PCI switches</td><td>medium</td></tr><tr><td><code>PHB</code></td><td>through the CPU&#x27;s PCI host bridge</td><td>slower</td></tr><tr><td><code>SYS</code></td><td>across CPUs (across NUMA / the whole box)</td><td>slowest</td></tr></tbody></table>
+
+<ul><li><strong><code>maxBw 80.0</code></strong> = the single fastest link (one NVLink).</li><li><strong><code>totalBw 240.0</code></strong> = all of a GPU&#x27;s links added up = its total sharing power.</li><li>Every GPU has <code>NVL[80.0]</code> to every other GPU → <strong>all-to-all</strong> (an NVSwitch). No slow hops.</li></ul>
+
+<p>💬 *If one GPU could only reach another through <code>SYS</code> (across CPUs), how would that change NCCL&#x27;s</p>
+<p>plan?* (It would avoid that slow hop, maybe use fewer channels, and be slower overall. The map</p>
+<p>decides everything.)</p>
+
+<h3>3b · NCCL can DUMP the map as XML</h3>
+
+<p>You can ask NCCL to save the exact map it drew. We did — see <strong><code>logs/topo_4gpu.xml</code></strong> in the lab</p>
+<p>folder. Turn it on yourself with:</p>
+
+<pre><code>export NCCL_TOPO_DUMP_FILE=$PWD/topo.xml     # the machine map
+export NCCL_GRAPH_DUMP_FILE=$PWD/graph.xml   # the rings it planned</code></pre>
+
+<p><strong><code>topo_4gpu.xml</code></strong> — the machine, as a tree of CPUs → PCI → GPUs/NICs:</p>
+
+<pre><code>&lt;cpu numaid=&quot;3&quot; arch=&quot;x86_64&quot; vendor=&quot;AuthenticAMD&quot;&gt;
+  &lt;pci busid=&quot;0000:03:00.0&quot; link_speed=&quot;16.0 GT/s PCIe&quot; link_width=&quot;16&quot;&gt;
+    &lt;gpu dev=&quot;0&quot; sm=&quot;80&quot; rank=&quot;0&quot; gdr=&quot;1&quot;&gt;
+      &lt;nvlink target=&quot;0000:81:00.0&quot; count=&quot;4&quot; tclass=&quot;0x030200&quot;/&gt;   &lt;!-- 4 NVLink lanes to GPU 2 --&gt;
+      &lt;nvlink target=&quot;0000:c1:00.0&quot; count=&quot;4&quot;/&gt;                     &lt;!-- 4 lanes to GPU 3 --&gt;
+      &lt;nvlink target=&quot;0000:41:00.0&quot; count=&quot;4&quot;/&gt;                     &lt;!-- 4 lanes to GPU 1 --&gt;
+    &lt;/gpu&gt;
+  &lt;/pci&gt;
+  &lt;nic&gt;&lt;net name=&quot;hsn1&quot; speed=&quot;200000&quot; gdr=&quot;0&quot;/&gt;&lt;/nic&gt;              &lt;!-- 200 Gb Slingshot NIC --&gt;
+  &lt;nic&gt;&lt;net name=&quot;bond0&quot; speed=&quot;1000&quot; gdr=&quot;0&quot;/&gt;&lt;/nic&gt;              &lt;!-- 1 Gb hello network --&gt;
+&lt;/cpu&gt;</code></pre>
+
+<p>Read it like this:</p>
+<ul><li><strong><code>&lt;gpu dev=&quot;0&quot; sm=&quot;80&quot;&gt;</code></strong> = GPU 0, an A100 (compute capability sm_80).</li><li><strong><code>&lt;nvlink target=... count=&quot;4&quot;&gt;</code></strong> = 4 NVLink lanes to that GPU. 4 lanes × ~20 GB/s = the</li></ul>
+<p>  <strong>80 GB/s</strong> you saw. Every GPU lists 3 such neighbors → all-to-all.</p>
+<ul><li><strong><code>&lt;net name=&quot;hsn1&quot; speed=&quot;200000&quot;&gt;</code></strong> = a Slingshot NIC, 200000 Mb = 200 Gb/s.</li><li><strong><code>gdr=&quot;1&quot;</code> on the GPU</strong> = this GPU *can* do GPUDirect RDMA; <strong><code>gdr=&quot;0&quot;</code> on bond0</strong> = that plain</li></ul>
+<p>  NIC cannot.</p>
+
+<p><strong><code>graph_4gpu.xml</code></strong> — the rings NCCL planned, as a list of channels:</p>
+
+<pre><code>&lt;graph id=&quot;0&quot; pattern=&quot;4&quot; nchannels=&quot;12&quot; speedintra=&quot;20&quot; typeintra=&quot;NVL&quot;&gt;
+  &lt;channel&gt;&lt;gpu dev=&quot;0&quot;/&gt;&lt;gpu dev=&quot;1&quot;/&gt;&lt;gpu dev=&quot;2&quot;/&gt;&lt;gpu dev=&quot;3&quot;/&gt;&lt;/channel&gt;  &lt;!-- ring: 0→1→2→3 --&gt;
+  &lt;channel&gt;&lt;gpu dev=&quot;0&quot;/&gt;&lt;gpu dev=&quot;1&quot;/&gt;&lt;gpu dev=&quot;3&quot;/&gt;&lt;gpu dev=&quot;2&quot;/&gt;&lt;/channel&gt;  &lt;!-- ring: 0→1→3→2 --&gt;
+  ...
+&lt;/graph&gt;</code></pre>
+
+<ul><li><strong><code>nchannels=&quot;12&quot;</code></strong> = 12 rings. Each <code>&lt;channel&gt;</code> is one ring&#x27;s GPU order.</li><li><strong><code>speedintra=&quot;20&quot; typeintra=&quot;NVL&quot;</code></strong> = each hop is a 20 GB/s NVLink lane.</li></ul>
+
+<p>💬 *These two files are just text. Why is it powerful that NCCL will hand you its whole plan?*</p>
+<p>(You can see exactly what it thinks your machine looks like. If a cable is bad or a GPU is</p>
+<p>missing, the XML shows it — this is how you prove a hardware problem to the admins.)</p>
+
+<hr>
+
+<h2>4 · Rings and Trees (the routes)</h2>
+
+<p>NCCL builds two kinds of routes and keeps <strong>many copies</strong> of each (called channels, §5).</p>
+
+<p><strong>Ring</strong> — pass data around a circle. Real lines (rank&#x27;s view of ring 00 on 4 GPUs):</p>
+
+<pre><code>Ring 00 : 0 -&gt; 1 -&gt; 2
+Ring 01 : 0 -&gt; 1 -&gt; 3
+Pattern 4, crossNic 0, nChannels 12, bw 20.0/20.0, type NVL/PIX</code></pre>
+
+<ul><li>NCCL built <strong>12 rings</strong> (<code>nChannels 12</code>), each a slightly different order, to use every link.</li><li>A ring is great for <strong>big</strong> messages: each GPU sends and receives at the same time, so the</li></ul>
+<p>  speed equals the link speed no matter how many GPUs.</p>
+
+<p><strong>Tree</strong> — add up like a tournament. Real line:</p>
+
+<pre><code>Trees [0] 1/-1/-1-&gt;0-&gt;-1 [8] 3/-1/-1-&gt;0-&gt;1 ...</code></pre>
+
+<p>Read <code>child1/child2/.../-&gt;me-&gt;parent</code>. <code>-1</code> means &quot;none&quot;. So <code>1/-1/-1-&gt;0-&gt;-1</code> = rank 0 has one</p>
+<p>child (rank 1) and no parent (it is the top). A tree is great for <strong>small</strong> messages because the</p>
+<p>answer reaches everyone in <code>log(N)</code> hops (few steps), not <code>N</code> hops.</p>
+
+<p>💬 *For 1024 GPUs, a ring passes data 1023 times; a tree only ~10 layers. So why not always use</p>
+<p>the tree?* (For BIG messages the ring keeps every link 100% busy = more total bandwidth. Tree</p>
+<p>wins on latency for small; ring wins on bandwidth for big. Hence §11.)</p>
+
+<h3>4b · Ring all-reduce, step by step (the actual algorithm)</h3>
+
+<p>This is the clever trick that makes ring the king for big data. Watch 4 GPUs add their arrays.</p>
+
+<p><strong>Setup.</strong> Each GPU cuts its array into <strong>4 equal parts</strong> (one part per GPU). GPU0&#x27;s parts are</p>
+<p>called <code>A0 A1 A2 A3</code>, GPU1&#x27;s are <code>B0 B1 B2 B3</code>, and so on. We want every part summed:</p>
+<p>part 0 must become <code>A0+B0+C0+D0</code>, everywhere.</p>
+
+<p><strong>Phase 1 — reduce-scatter (N−1 = 3 steps).</strong> Each GPU sends ONE part to its right neighbor,</p>
+<p>who <strong>adds</strong> it. The part being sent shifts each step, so no link is ever idle.</p>
+
+<pre><code>start:     GPU0[A0 A1 A2 A3]  GPU1[B0 B1 B2 B3]  GPU2[C0 C1 C2 C3]  GPU3[D0 D1 D2 D3]
+
+step 1  (each sends one part → right, neighbor adds):
+           GPU0 sends A3→GPU1 ... after adding:
+           GPU1 has B3+A3 ,  GPU2 has C0+B0 ,  GPU3 has D1+C1 ,  GPU0 has A2+D2
+
+step 2  (send the part you just grew):
+           now e.g. GPU2 holds C0+B0+A0 , GPU3 holds D1+C1+B1 , ...
+
+step 3:
+           each GPU now OWNS one fully-summed part:
+           GPU0→ part2 = A2+B2+C2+D2 ,  GPU1→ part3 ,  GPU2→ part0 ,  GPU3→ part1</code></pre>
+
+<p>After 3 steps, each GPU holds <strong>one</strong> complete sum (its &quot;owned&quot; part). Nobody has the whole</p>
+<p>answer yet — but every part exists, fully summed, on exactly one GPU.</p>
+
+<p><strong>Phase 2 — all-gather (N−1 = 3 steps).</strong> Now just <strong>circulate</strong> those finished parts around the</p>
+<p>ring so everyone ends up with all 4.</p>
+
+<pre><code>step 1: each GPU sends its owned finished part → right (no adding now, just copy)
+step 2: pass it along again
+step 3: done — every GPU has [part0 part1 part2 part3], all fully summed = the all-reduce result</code></pre>
+
+<p><strong>Why this is genius (the math):</strong> every GPU sent <code>2(N−1)</code> parts total, each part = <code>1/N</code> of the</p>
+<p>array. So each GPU moves about <strong><code>2 × array size</code></strong> of data — <strong>no matter how many GPUs!</strong> That is</p>
+<p>why ring bus-bandwidth stays near the link speed whether you have 4 GPUs or 4000. (This is what the</p>
+<p><code>busbw</code> number in Parts A/B measures.)</p>
+
+<p>💬 *A tree finishes in ~<code>log(N)</code> steps but a ring takes <code>2(N−1)</code>. Yet ring is faster for big data.</p>
+<p>How can more steps be faster?* (Each ring step moves only <code>1/N</code> of the data and ALL links work at</p>
+<p>once. The tree moves big blocks but leaves most links idle. Big data → keep every wire busy → ring.)</p>
+
+<h3>4c · Tree all-reduce (the low-latency cousin)</h3>
+
+<p>For <strong>small</strong> messages the cost is the number of hops, not bandwidth. A tree needs far fewer hops:</p>
+
+<pre><code>Reduce UP (leaves → root):        Broadcast DOWN (root → leaves):
+        0                                   0
+       / \           add on the way up     / \      copy on the way down
+      1   2          → root 0 has the      1   2
+     /                total sum            /
+    3                                     3</code></pre>
+
+<p>Reduce up ≈ <code>log(N)</code> steps, broadcast down ≈ <code>log(N)</code> steps → about <code>2·log(N)</code> total. For 1024</p>
+<p>GPUs that is ~20 hops instead of ~2046. Tiny messages fly. That is the <code>Tree</code> you saw in Part D.</p>
+
+<p><strong>One real detail:</strong> NCCL does not use ONE tree — it uses a <strong>double binary tree</strong>. A single tree</p>
+<p>leaves half the links idle (a parent only talks downward). NCCL overlaps <strong>two</strong> trees, flipped,</p>
+<p>so every link carries traffic in both directions at once. That is why NCCL&#x27;s tree gets good</p>
+<p>bandwidth *and* good latency. (You saw <code>Trees [0]…[23]</code> in the log = many trees, not one.)</p>
+
+<h3>4d · Other algorithms you will meet</h3>
+
+<ul><li><strong>Recursive halving / doubling</strong> — another all-reduce shape for power-of-two GPU counts. Step 1:</li></ul>
+<p>  pair up (0↔1, 2↔3) and exchange half the data. Step 2: pair at distance 2 (0↔2) and exchange a</p>
+<p>  quarter. After <code>log(N)</code> steps everyone has the sum. Fewer steps than a ring, more than a tree — a</p>
+<p>  middle ground some libraries prefer.</p>
+<ul><li><strong>All-to-all</strong> — every GPU sends a <strong>different</strong> piece to every other GPU (not the same data to</li></ul>
+<p>  all). This is the heavy pattern in <strong>Mixture-of-Experts</strong> models and some parallel FFTs. It moves</p>
+<p>  the most data of any collective, so the network matters most here.</p>
+<ul><li><strong>In-network reduction (SHARP / NVLS)</strong> — the switch adds the numbers itself (§11). On InfiniBand</li></ul>
+<p>  this is called <strong>SHARP</strong>; on NVLink it is <strong>NVLS</strong>. Same idea: do the math in the wires, not the GPUs.</p>
+
+<p>💬 *Ring, tree, recursive-doubling, in-network — four ways to do the SAME all-reduce. Who decides</p>
+<p>which one your training uses?* (NCCL&#x27;s cost model, §10 — it predicts all of them for your machine</p>
+<p>and message size, then picks the winner. You never choose.)</p>
+
+<hr>
+
+<h2>5 · Channels and CUDA threads</h2>
+
+<p>A <strong>channel</strong> is one worker lane: a piece of the GPU (a block of CUDA threads on one SM) that</p>
+<p>drives one ring or tree. More channels = more links used at once = more speed.</p>
+
+<pre><code>24 coll channels, 0 nvls channels, 32 p2p channels, 8 p2p channels per peer
+Max NThreads | 512 | 640 | 512 |   (LL | LL128 | Simple)</code></pre>
+
+<ul><li><strong><code>24 coll channels</code></strong> = 24 lanes for collectives (all-reduce, etc.).</li><li><strong><code>32 p2p channels</code></strong> = lanes for point-to-point send/recv.</li><li><strong><code>Max NThreads 512/640</code></strong> = how many CUDA threads run each lane (depends on protocol).</li></ul>
+
+<p>💬 *Why not use 1000 channels for maximum speed?* (Each channel eats an SM and memory. Past a</p>
+<p>point you run out of GPU and it gets slower. NCCL picks a number that fits the machine.)</p>
+
+<hr>
+
+<h2>6 · Transports: P2P, SHM, NET (how bytes actually move)</h2>
+
+<p>For each link, NCCL picks the best way to move bytes:</p>
+
+<table><thead><tr><th>transport</th><th>what it is</th><th>when</th></tr></thead><tbody><tr><td><strong>P2P</strong></td><td>one GPU reads/writes another GPU&#x27;s memory directly</td><td>GPUs in the same box (NVLink/PCIe)</td></tr><tr><td><strong>SHM</strong></td><td>copy through shared host (CPU) memory</td><td>GPUs in one box with no direct link</td></tr><tr><td><strong>NET</strong></td><td>send over the network (OFI/cxi = Slingshot RDMA)</td><td>GPUs on <strong>different</strong> boxes</td></tr></tbody></table>
+
+<p>Real lines:</p>
+
+<pre><code>Channel 00/0 : 1[1] -&gt; 2[2] via P2P/direct pointer/read       (same box: NVLink)
+Allocated 4194660 bytes of shared memory in /dev/shm/nccl-1ivDVe   (SHM segment)
+Channel 00/0 : 0[0] -&gt; 1[0] [send] via NET/OFI/0              (different boxes: Slingshot)</code></pre>
+
+<ul><li><strong><code>via P2P/direct pointer/read</code></strong> = GPU 1 literally reads GPU 2&#x27;s memory. No copy, no CPU.</li><li><strong><code>via NET/OFI</code></strong> = it goes to the network card and across Slingshot (your Part B).</li></ul>
+
+<p>💬 *Same-box P2P was ~200 GB/s; cross-box NET was ~9 GB/s. Both are &quot;direct&quot;. Why the 20× gap?*</p>
+<p>(NVLink is a short wire on the board; the network is a long cable to another rack. Distance and</p>
+<p>the extra network card cost speed — even with RDMA.)</p>
+
+<hr>
+
+<h2>7 · Buffers and chunking</h2>
+
+<p>NCCL does not send your whole message at once. It slices it into <strong>chunks</strong> and pipelines them</p>
+<p>through pre-made <strong>buffers</strong> (staging areas).</p>
+
+<pre><code>Allocated shareable buffer 0x7f73bc000000 size 6291456 ipcDesc 0x...
+P2P Chunksize set to 524288</code></pre>
+
+<ul><li><strong><code>size 6291456</code></strong> = a 6 MB buffer (from <code>NCCL_BUFFSIZE</code>). <code>ipcDesc</code> = a handle so other GPUs</li></ul>
+<p>  can see this buffer.</p>
+<ul><li><strong><code>Chunksize 524288</code></strong> = 512 KB pieces. NCCL sends piece 1 while computing piece 2 → a pipeline,</li></ul>
+<p>  so links never sit idle.</p>
+
+<p>💬 *Why chunk at all — why not send the whole 256 MB in one go?* (Pipelining: while chunk 1 is</p>
+<p>flying across the wire, the GPU already works on chunk 2. Overlap = no waiting = faster.)</p>
+
+<hr>
+
+<h2>8 · The proxy (the background helper) — in detail</h2>
+
+<p>Here is the problem. A GPU is a math monster, but it is <strong>bad at waiting</strong>. Talking to a network</p>
+<p>card means: post a send, wait for the card to say &quot;done&quot;, handle errors, retry. If the GPU did</p>
+<p>that, its thousands of math cores would sit frozen while one of them babysits a slow NIC. Huge waste.</p>
+
+<p>So NCCL starts a <strong>proxy</strong>: a small <strong>CPU helper thread, one per GPU</strong>. Division of labour:</p>
+
+<pre><code>   GPU (compute)                         CPU proxy thread
+   ───────────────                       ─────────────────
+   run the ring/tree kernel      ──▶     &quot;here is chunk 5, please send it&quot;
+   keep doing MATH on chunk 6            post chunk 5 to the NIC / shared memory
+   ...never stops...             ◀──     &quot;chunk 5 arrived, here is incoming chunk 4&quot;</code></pre>
+
+<p>Real lines from the log:</p>
+
+<pre><code>Connection to proxy localRank 0 -&gt; connection 0x7f7458000d20     &lt;- GPU wires itself to its proxy
+ncclPollProxyResponse Received new opId=0x7f74c3663ab0            &lt;- proxy reports a step is done</code></pre>
+
+<ul><li>The GPU and proxy talk through a tiny mailbox (a FIFO queue). The GPU drops &quot;please move this</li></ul>
+<p>  chunk&quot; notes; the proxy does the slow network work and drops back &quot;done&quot; notes.</p>
+<ul><li>This is why NCCL <strong>overlaps</strong> communication and computation: while the proxy pushes chunk 5</li></ul>
+<p>  across Slingshot, the GPU is already reducing chunk 6. Nobody waits (§7 chunking makes this work).</p>
+<ul><li>On the network path, the proxy is also who calls libfabric/cxi — so **the proxy is the thing</li></ul>
+<p>  that actually touches RDMA** (remember this for the Python section: PyTorch → NCCL → proxy → cxi).</p>
+
+<p>💬 *The proxy runs on the CPU, which is much slower than the GPU. Why doesn&#x27;t that slow everything</p>
+<p>down?* (It only does bookkeeping and hands work to the NIC — it never does the heavy math. As long</p>
+<p>as it keeps up with the chunk pipeline, the GPU never notices it is there.)</p>
+
+<hr>
+
+<h2>9 · GDR — GPUDirect RDMA (and when it quietly turns OFF)</h2>
+
+<p>Normally, to send GPU data over the network you copy twice: GPU → CPU memory → network card.</p>
+<p><strong>GDR</strong> removes the middle step: the <strong>network card reads GPU memory directly</strong>. (Think of a</p>
+<p><strong>courier who walks straight into your room, picks up the box, and carries it out</strong> — instead of</p>
+<p>a clerk who photocopies it at every desk. That courier is GDR.)</p>
+
+<p>Real lines from the <strong>2-node</strong> run:</p>
+
+<pre><code>NET/OFI : GPU Direct RDMA Enabled for HCA 0 &#x27;cxi0&#x27;                  &lt;- the Slingshot card CAN do GDR
+GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 &gt; 6)      &lt;- ...but NOT for this GPU</code></pre>
+
+<p>Read carefully — there are two different lines and they seem to disagree. They do not:</p>
+
+<ul><li>The cxi card <strong>supports</strong> GDR (<code>Enabled for HCA cxi0</code>).</li><li><strong>But</strong> for our GPU (busId 3000) NCCL <strong>turned it off</strong>, because that GPU and the cxi0 card are</li></ul>
+<p>  <strong>too far apart on the board</strong> (<code>distance 7 &gt; 6</code>, the level we allowed with <code>NCCL_NET_GDR_LEVEL</code>).</p>
+<p>  So on our run, data still took the long way: GPU → host memory → card.</p>
+
+<p>Honest takeaway: our Part B (~9 GB/s) used <strong>RDMA</strong> (kernel-bypass network, no CPU in the loop for</p>
+<p>the transfer) but <strong>not full GPUDirect</strong> for that GPU — because we pinned everyone to one NIC</p>
+<p>(<code>cxi0</code>) that is far from some GPUs. If each GPU could use its own <strong>nearby</strong> NIC (cxi0 or cxi1),</p>
+<p>GDR would switch on and the number would climb. That is the real, measurable cost of the cxi1</p>
+<p>work-around (see the lab README). On the <strong>TCP</strong> path (Part C) GDR is always off.</p>
+
+<p>💬 *We turned RDMA ON and still only got 9 GB/s. This log line explains why. What is it, and what</p>
+<p>would we change to go faster?* (GDR was disabled by distance; giving each GPU its nearest NIC —</p>
+<p>fixing the cxi1 issue — would enable GDR and raise the bandwidth.)</p>
+
+<hr>
+
+<h2>10 · The tuning cost model — NCCL&#x27;s secret cheat-sheet ⭐</h2>
+
+<p>This is the most important table in the whole log. Before running, NCCL <strong>predicts</strong> the speed of</p>
+<p>every way to send, and saves it. Then per message size it instantly picks the best.</p>
+
+<pre><code>    Algorithm   |            Tree                |            Ring                |
+    Protocol    |   LL   |  LL128  |  Simple |   LL   |  LL128  |  Simple |
+    AllReduce   | 10.4/29| 21.5/86 | 24.0/110| 10.2/40| 25.4/147| 28.8/160|
+                   ↑ latency(µs) / bandwidth(GB/s)</code></pre>
+
+<p>Read each cell as <strong>latency (µs) / bandwidth (GB/s)</strong> — start-up delay, and top speed.</p>
+
+<p>The three <strong>protocols</strong> are three ways to pack the data — think of shipping a gift: <strong>LL</strong> = a</p>
+<p>postcard (tiny, leaves instantly, best for *small* messages), <strong>LL128</strong> = a padded envelope (a</p>
+<p>middle choice tuned for NVLink), <strong>Simple</strong> = a big truck (slow to load but carries a LOT, best</p>
+<p>for *big* messages). The table below is how NCCL decides which one to send.</p>
+
+<ul><li><strong>Small message</strong> → start-up delay wins. Cheapest is <strong>Tree-LL (10.4 µs)</strong> or **Ring-LL</li></ul>
+<p>  (10.2 µs)<strong>. → NCCL picks </strong>LL**.</p>
+<ul><li><strong>Big message</strong> → top speed wins. Fastest is <strong>Ring-Simple (160 GB/s)</strong>. → NCCL picks</li></ul>
+<p>  <strong>Ring + Simple</strong>.</p>
+
+<p><strong>That single table is the reason</strong> Part D showed LL winning small and Simple winning big — you</p>
+<p>were watching this cost model in action.</p>
+
+<pre><code>threadThresholds 8/8/64 | 32/8/64 | 512 | 512</code></pre>
+
+<p>= the message sizes where NCCL flips from one protocol to the next.</p>
+
+<p>💬 *NCCL measured these numbers for YOUR machine at startup. Why not just hard-code &quot;always use</p>
+<p>Ring-Simple&quot;?* (Every machine is different — NVLink vs PCIe vs network change the numbers. Measuring</p>
+<p>makes NCCL fast everywhere without you tuning anything.)</p>
+
+<hr>
+
+<h2>11 · NVLS — NVLink SHARP (the feature you do NOT have)</h2>
+
+<pre><code>NVLS multicast support is not available on dev 0</code></pre>
+
+<p><strong>NVLS</strong> lets the <strong>NVSwitch chip itself add the numbers</strong> as they pass through — the network does</p>
+<p>the math, not the GPUs. It is very fast, but needs newer hardware (Hopper H100 + NVSwitch v3).</p>
+<p>On these A100s it is off, so NCCL uses Ring/Tree instead.</p>
+
+<p>💬 *If the switch could add numbers itself, why is that faster than a ring?* (No GPU has to receive,</p>
+<p>add, and re-send. The data is summed &quot;in flight&quot;. Fewer trips = less time.)</p>
+
+<hr>
+
+<h2>12 · The collectives zoo</h2>
+
+<p>All-reduce is one of a family. Same machinery, different pattern:</p>
+
+<table><thead><tr><th>collective</th><th>what it does</th><th>picture</th></tr></thead><tbody><tr><td><strong>AllReduce</strong></td><td>everyone adds, everyone gets the total</td><td>today&#x27;s lab</td></tr><tr><td><strong>Broadcast</strong></td><td>one GPU&#x27;s data copied to all</td><td>teacher hands out a sheet</td></tr><tr><td><strong>Reduce</strong></td><td>everyone adds, only rank 0 keeps it</td><td>collect homework to teacher</td></tr><tr><td><strong>AllGather</strong></td><td>everyone collects everyone&#x27;s piece</td><td>each gets the full class list</td></tr><tr><td><strong>ReduceScatter</strong></td><td>add, then split the result across GPUs</td><td>add, then each keeps a slice</td></tr><tr><td><strong>Send/Recv</strong></td><td>one GPU to one GPU</td><td>passing one note</td></tr></tbody></table>
+
+<p>The <strong>operation</strong> can be <code>ncclSum</code>, <code>ncclProd</code>, <code>ncclMax</code>, <code>ncclMin</code>. The <strong>datatype</strong> can be</p>
+<p><code>ncclFloat</code>, <code>ncclHalf</code> (fp16), <code>ncclBfloat16</code>, <code>ncclInt</code>, … (AI uses fp16/bf16 to go faster.)</p>
+
+<p>💬 *Training an AI averages the gradients from all GPUs. Which collective is that — AllReduce with</p>
+<p>Sum then divide, or Broadcast?* (AllReduce-Sum, then divide by N = the average. This runs millions</p>
+<p>of times during training.)</p>
+
+<hr>
+
+<h2>13 · Useful knobs (environment variables)</h2>
+
+<p>You set these before running. The safe ones to explore:</p>
+
+<table><thead><tr><th>variable</th><th>what it does</th></tr></thead><tbody><tr><td><code>NCCL_DEBUG=INFO</code></td><td>print the setup log (what this guide reads)</td></tr><tr><td><code>NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH,TUNING</code></td><td>show only some parts of the log</td></tr><tr><td><code>NCCL_ALGO=Ring</code> / <code>Tree</code></td><td>force the shape (normally: don&#x27;t)</td></tr><tr><td><code>NCCL_PROTO=Simple</code> / <code>LL</code> / <code>LL128</code></td><td>force the protocol (normally: don&#x27;t)</td></tr><tr><td><code>NCCL_MAX_NCHANNELS=4</code></td><td>limit the number of lanes</td></tr><tr><td><code>NCCL_NET=Socket</code></td><td>force slow TCP (Part C)</td></tr><tr><td><code>NCCL_P2P_DISABLE=1</code></td><td>turn off direct GPU↔GPU (forces SHM — slower, for testing)</td></tr></tbody></table>
+
+<p>💬 *<code>NCCL_ALGO</code> and <code>NCCL_PROTO</code> exist, but experts say &quot;leave them unset&quot;. Why give a knob you</p>
+<p>should not touch?* (For 99% of cases NCCL&#x27;s cost model beats a human. The knobs are for rare</p>
+<p>debugging or a weird machine — not for daily use.)</p>
+
+<hr>
+
+<h2>14 · Debug like a pro — where to look when it breaks</h2>
+
+<table><thead><tr><th>symptom</th><th>first thing to check in the log</th></tr></thead><tbody><tr><td><strong>Hang</strong> (nothing happens)</td><td>did every rank reach <code>Init COMPLETE</code>? A missing rank = stuck bootstrap (§2).</td></tr><tr><td><strong>Slow</strong></td><td>look at §10 — is it picking Simple/Ring for big messages? Is <code>nChannels</code> low?</td></tr><tr><td><strong><code>Device or resource busy</code> / NET error</strong></td><td>a transport/network setup problem (§6, §9), not your math.</td></tr><tr><td><strong>Wrong answer / <code>#wrong</code> not 0</strong></td><td>a data or datatype bug in your code, not NCCL.</td></tr><tr><td><strong>Crash right at start</strong></td><td>version mismatch (NCCL vs test vs CUDA) — check the <code>NCCL version</code> line.</td></tr></tbody></table>
+
+<p>💬 *A friend says &quot;my 8-GPU training hangs at the start&quot;. Using this guide, what ONE thing do you</p>
+<p>ask them to grep first?* (`grep &quot;Init COMPLETE&quot; — how many? If not 8, one rank never joined =</p>
+<p>bootstrap/network problem.)</p>
+
+<hr>
+
+<h2>You made it 🎓</h2>
+
+<p>You can now open a raw NCCL log — thousands of lines that look like noise — and <strong>read the story</strong>:</p>
+<p>who joined the team, what the machine looks like, which routes were planned, how bytes move, and</p>
+<p>why NCCL chose what it chose. That is a real, rare skill. Very few people can do it. Now you can.</p>
+
+</body></html>

@@ -1,0 +1,11 @@
+Warning: Permanently added 'lanta.nstda.or.th' (ED25519) to the list of known hosts.
+@@ EXIT=143
+---save-evidence---
+x1000c2s1b0n1:3591215:3592750 [0] NCCL INFO GPU Direct RDMA Disabled for GPU 3000 / HCA 0 (distance 7 > 6)
+x1000c2s1b0n1:3591215:3592750 [0] NCCL INFO NET/OFI : GPU Direct RDMA Enabled for HCA 0 'cxi0'
+x1000c2s1b0n1:3591215:3592750 [0] NCCL INFO NET/OFI Selected provider is cxi, fabric is cxi (found 1 nics)
+x1000c2s1b0n1:3591215:3592750 [0] NCCL INFO Using network OFI
+x1000c2s1b0n1:3591218:3592751 [3] NCCL INFO Channel 00/0 : 3[3] -> 4[0] [send] via NET/OFI/0/GDRDMA
+x1000c2s1b0n1:3591218:3592751 [3] NCCL INFO Channel 02/0 : 3[3] -> 4[0] [send] via NET/OFI/0/GDRDMA
+x1000c2s1b0n1:3591218:3592751 [3] NCCL INFO GPU Direct RDMA Enabled for GPU c1000 / HCA 0 (distance 6 <= 6), read 1
+x1000c2s1b0n1:3591218:3592751 [3] NCCL INFO NET/OFI : GPU Direct RDMA Enabled for HCA 0 'cxi0'

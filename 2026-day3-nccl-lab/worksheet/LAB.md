@@ -392,6 +392,11 @@ grep "coll channels"   partF_*.out | head -1      # 5. how many channels at the 
 > (or Slingshot RDMA). Why use two different networks? (Hint: saying "hello" is tiny and rare;
 > moving AI data is huge and constant. Use a cheap line for hello, a highway for the data.)
 
+> 📖 **Want to go deeper?** Every one of these 5 steps — plus transports, buffers, the proxy,
+> GDR, the tuning cost model, NVLS, and how to debug a real cluster — is explained from zero in
+> the **NCCL Field Guide** (`FIELDGUIDE.html`). It is a full reference with a discussion question
+> on every topic.
+
 ---
 
 ## What you learned today
@@ -405,3 +410,14 @@ grep "coll channels"   partF_*.out | head -1      # 5. how many channels at the 
 - Before moving one byte, NCCL **shakes hands, maps the machine, plans rings/trees, opens the
   roads, and writes a tuning cheat-sheet** — you saw all of it in the full log (Part F).
 - You wrote **`ncclAllReduce`** with your own hands. That is how real AI is trained. Well done. 👏
+
+### 📚 Two companion guides (go as deep as you like)
+
+- **`FIELDGUIDE.html`** — read any NCCL log like a pro: the handshake, topology (+ the real XML
+  dumps), ring/tree **algorithms drawn step by step**, transports, the proxy, GDR, the tuning
+  cost model, NVLS, the collectives zoo, and how to debug a cluster. A discussion question on
+  every topic.
+- **`PYTORCH_RDMA.html`** — the question everyone asks: *"how does my **Python** code use RDMA?"*
+  The full layer cake (your Python → PyTorch DDP → NCCL → Slingshot RDMA), a real DDP program
+  (`lab/ddp_demo.py`), and how gradient all-reduce makes multi-GPU training work.
+- Real captured logs to look at live are in **`logs/`** (see `logs/README.md`).
